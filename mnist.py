@@ -97,54 +97,86 @@ def test( model, device, test_loader):
         test_loss, correct, len(test_loader.dataset),
         100. * correct / len(test_loader.dataset)))
 
+
+
+def main():
+    # Training settings
+    parser = argparse.ArgumentParser(description='DPSGD')
+    parser.add_argument('--batchsize', type=int, default=256, metavar='N',
+                        help='input batch size for training (default: 64)')
+    parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
+                        help='input batch size for testing (default: 1000)')
+    parser.add_argument('--epochs', type=int, default=70, metavar='N',
+                        help='number of epochs to train (default: 10)')
+    parser.add_argument('--lr', type=float, default=0.15, metavar='LR',
+                        help='learning rate (default: 0.01)')
+    parser.add_argument('--momentum', type=float, default=0.5, metavar='M',
+                        help='SGD momentum (default: 0.5)')
     
-train_batch = 1
-test_batch = 1000
+    parser.add_argument('--norm-clip', type=float, default=1.0, metavar='M',
+                        help='L2 norm clip (default: 1.0)')
+    parser.add_argument('--noise-multiplier', type=float, default=1.0, metavar='M',
+                        help='Noise multiplier (default: 1.0)')
+    
+    
+    parser.add_argument('--no-cuda', action='store_true', default=False,
+                        help='disables CUDA training')
+    
+    parser.add_argument('--microbatches',type=int, default=1, metavar='N',
+                        help='Majority Thresh')
+    args = parser.parse_args()
+    use_cuda = not args.no_cuda and torch.cuda.is_available()
+    
+    train_batch = args.microbatches
+    test_batch = args.test_batch_size
 
 
 
-use_cuda = torch.cuda.is_available()
 
 
 
-device = torch.device("cuda" if use_cuda else "cpu")
+    device = torch.device("cuda" if use_cuda else "cpu")
 
-kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
-train_loader = torch.utils.data.DataLoader(
-    datasets.MNIST('./data', train=True, download=True,
-                   transform=transforms.Compose([
-                       transforms.ToTensor(),
-                       
-                   ])),
-    batch_size=train_batch, shuffle=True, **kwargs)
-test_loader = torch.utils.data.DataLoader(
-    datasets.MNIST('./data', train=False, transform=transforms.Compose([
-                       transforms.ToTensor(),
-     
+    kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
+    train_loader = torch.utils.data.DataLoader(
+        datasets.MNIST('./data', train=True, download=True,
+                       transform=transforms.Compose([
+                           transforms.ToTensor(),
+
+                       ])),
         
-                   ])),
-    batch_size=test_batch , shuffle=True, **kwargs)
-
-train_test_loader = torch.utils.data.DataLoader(
-    
-    datasets.MNIST('./data', train=True, transform=transforms.Compose([
-                       transforms.ToTensor(),
-                   ])),
-    batch_size=test_batch , shuffle=True, **kwargs)
+        
+        batch_size=train_batch, shuffle=True, **kwargs)
+    test_loader = torch.utils.data.DataLoader(
+        datasets.MNIST('./data', train=False, transform=transforms.Compose([
+                           transforms.ToTensor(),
 
 
+                       ])),
+        batch_size=test_batch , shuffle=True, **kwargs)
 
-model = Net().to(device)
+    train_test_loader = torch.utils.data.DataLoader(
+
+        datasets.MNIST('./data', train=True, transform=transforms.Compose([
+                           transforms.ToTensor(),
+                       ])),
+        batch_size=test_batch , shuffle=True, **kwargs)
 
 
-optimizer = dpsgd.DPSGD(model.parameters(),lr=0.15,batch_size=256,C=1.,noise_multiplier=1.0)
+
+    model = Net().to(device)
 
 
-for epoch in range(0, 70):
+    optimizer = dpsgd.DPSGD(model.parameters(),lr=args.lr,batch_size=args.batchsize//args.microbatches,C=args.norm_clip,noise_multiplier=args.noise_multiplier)
 
 
-    train( model, device, train_loader, optimizer, epoch)
-    
-    test( model, device, test_loader)
-    test( model, device, train_test_loader)
+    for epoch in range(args.epochs):
 
+
+        train( model, device, train_loader, optimizer, epoch)
+
+        test( model, device, test_loader)
+        test( model, device, train_test_loader)
+
+if __name__ == '__main__':
+    main()
