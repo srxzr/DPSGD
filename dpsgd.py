@@ -77,8 +77,8 @@ class DPSGD(Optimizer):
                     
                     self.bigger_batch_count[p.myid] =  torch.cuda.LongTensor(size=[1]).zero_() if self.bigger_batch[p.myid].is_cuda else  torch.LongTensor(size=[1]).zero_()
 
-                norm+=grad.norm()
-                
+                norm+=grad.norm()**2.0
+        norm=norm**(0.5)
                 
         
         for group in self.param_groups:
